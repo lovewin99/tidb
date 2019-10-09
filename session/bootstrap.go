@@ -898,6 +898,7 @@ func upgradeToVer35(s Session) {
 }
 
 func upgradeCustom(s Session) {
+	mustExecute(s, "CREATE DATABASE IF NOT EXISTS tidb_monitor")
 	mustExecute(s, CreateQueryLog)
 	mustExecute(s, CreateQueryLogIgnore)
 }
