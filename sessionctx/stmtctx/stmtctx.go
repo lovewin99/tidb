@@ -134,6 +134,14 @@ type StatementContext struct {
 		digest     string
 	}
 	Tables []TableEntry
+
+	// for query_log
+	SqlText   string
+	NeedLog   bool
+	StartTime time.Time
+	EndTime   time.Time
+	// should be sorted
+	TableNames []string
 }
 
 // GetNowTsCached getter for nowTs, if not set get now time and cache it

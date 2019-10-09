@@ -518,6 +518,8 @@ func (ds *DataSource) convertToIndexScan(prop *property.PhysicalProperty, candid
 		// On this way, it's double read case.
 		ts := PhysicalTableScan{
 			Columns:         ds.Columns,
+			// for query_log
+			DBName:          is.DBName,
 			Table:           is.Table,
 			isPartition:     ds.isPartition,
 			physicalTableID: ds.physicalTableID,

@@ -269,6 +269,38 @@ const (
 	CreateOptRuleBlacklist = `CREATE TABLE IF NOT EXISTS mysql.opt_rule_blacklist (
 		name char(100) NOT NULL
 	);`
+
+	CreateQueryLog = `CREATE TABLE IF NOT EXISTS tidb_monitor.query_log (
+		id int(10) UNSIGNED NOT NULL AUTO_INCREMENT,
+		USER varchar(128) DEFAULT NULL COMMENT '登录账号',
+		sql_type varchar(16) DEFAULT NULL COMMENT 'sql操作类型，如select，insert，create',
+		duration decimal(12,8) DEFAULT NULL COMMENT 'sql执行时长，单位：秒',
+		start_time datetime DEFAULT NULL COMMENT '执行开始时间',
+		end_time datetime DEFAULT NULL COMMENT '执行结束时间',
+		start_day varchar(16) DEFAULT NULL COMMENT '执行开始日期',
+		start_hour varchar(8) DEFAULT NULL COMMENT '执行开始小时',
+		server_addr varchar(32) DEFAULT NULL COMMENT '执行sql的tidb实例ip',
+		tbls varchar(1024) DEFAULT NULL COMMENT 'sql涉及的表',
+		conn_id int(11) DEFAULT NULL COMMENT '数据库连接id',
+		affect_rows int(11) DEFAULT NULL COMMENT '数据插入条数',
+		found_rows int(11) DEFAULT NULL COMMENT '返回数据条数',
+		memory_usage decimal(24,8) DEFAULT NULL COMMENT '内存使用量，单位KB',
+		exec_details varchar(2028) DEFAULT NULL COMMENT 'sql执行内部跟踪具体信息',
+		sql_info text DEFAULT NULL COMMENT '具体sql，超过2万字符有截取',
+		error_info text DEFAULT NULL COMMENT 'sql错误信息',
+		PRIMARY KEY (id),
+		KEY ql_time_user_type (start_day,start_hour,USER,sql_type),
+		KEY ql_day_user_type (start_day,USER,sql_type)
+	);`
+
+	CreateQueryLogIgnore = ` CREATE TABLE IF NOT EXISTS tidb_monitor.query_log_ignore (
+		id int(10) UNSIGNED NOT NULL AUTO_INCREMENT,
+		user varchar(128) DEFAULT NULL,
+		create_time timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+		PRIMARY KEY (id),
+		UNIQUE KEY user (user)
+	); `
+
 )
 
 // bootstrap initiates system DB for a store.
@@ -548,6 +580,7 @@ func upgrade(s Session) {
 		upgradeToVer35(s)
 	}
 
+	upgradeCustom(s)
 	updateBootstrapVer(s)
 	_, err = s.Execute(context.Background(), "COMMIT")
 
@@ -862,6 +895,11 @@ func upgradeToVer35(s Session) {
 	sql := fmt.Sprintf("UPDATE HIGH_PRIORITY %s.%s SET VARIABLE_NAME = '%s' WHERE VARIABLE_NAME = 'tidb_back_off_weight'",
 		mysql.SystemDB, mysql.GlobalVariablesTable, variable.TiDBBackOffWeight)
 	mustExecute(s, sql)
+}
+
+func upgradeCustom(s Session) {
+	mustExecute(s, CreateQueryLog)
+	mustExecute(s, CreateQueryLogIgnore)
 }
 
 // updateBootstrapVer updates bootstrap version variable in mysql.TiDB table.

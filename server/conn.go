@@ -43,6 +43,7 @@ import (
 	"io"
 	"net"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -58,6 +59,7 @@ import (
 	"github.com/pingcap/tidb/kv"
 	"github.com/pingcap/tidb/metrics"
 	"github.com/pingcap/tidb/plugin"
+	"github.com/pingcap/tidb/session"
 	"github.com/pingcap/tidb/sessionctx"
 	"github.com/pingcap/tidb/sessionctx/variable"
 	"github.com/pingcap/tidb/util/arena"
@@ -127,6 +129,7 @@ func newClientConn(s *Server) *clientConn {
 		collation:    mysql.DefaultCollationID,
 		alloc:        arena.NewAllocator(32 * 1024),
 		status:       connStatusDispatching,
+		sqlCh:        make(chan sqlRecord, 100),
 	}
 }
 
@@ -151,6 +154,10 @@ type clientConn struct {
 	peerHost     string            // peer host
 	peerPort     string            // peer port
 	lastCode     uint16            // last error code
+
+	ignoreLog bool // whether to log user query log
+	sqlCh     chan sqlRecord
+
 }
 
 func (cc *clientConn) String() string {
@@ -195,6 +202,7 @@ func (cc *clientConn) Close() error {
 	cc.server.rwlock.Lock()
 	delete(cc.server.clients, cc.connectionID)
 	connections := len(cc.server.clients)
+	close(cc.sqlCh)
 	cc.server.rwlock.Unlock()
 	return closeConn(cc, connections)
 }
@@ -609,6 +617,9 @@ func (cc *clientConn) Run(ctx context.Context) {
 			terror.Log(err)
 		}
 	}()
+
+	go cc.initLogSql()
+
 	// Usually, client connection status changes between [dispatching] <=> [reading].
 	// When some event happens, server may notify this client connection by setting
 	// the status to special values, for example: kill or graceful shutdown.
@@ -670,6 +681,8 @@ func (cc *clientConn) Run(ctx context.Context) {
 				zap.String("sql", queryStrForLog(string(data[1:]))),
 				zap.String("err", errStrForLog(err)),
 			)
+			// when error
+			cc.logSql(err)
 			err1 := cc.writeError(err)
 			terror.Log(err1)
 		}
@@ -1193,6 +1206,8 @@ func (cc *clientConn) handleQuery(ctx context.Context, sql string) (err error) {
 			err = cc.writeMultiResultset(ctx, rs, false)
 		}
 	} else {
+		// query is success, but have no data to return
+		cc.logSql(err)
 		loadDataInfo := cc.ctx.Value(executor.LoadDataVarKey)
 		if loadDataInfo != nil {
 			defer cc.ctx.SetValue(executor.LoadDataVarKey, nil)
@@ -1249,6 +1264,9 @@ func (cc *clientConn) handleFieldList(sql string) (err error) {
 // resultsets, it's used to support the MULTI_RESULTS capability in mysql protocol.
 func (cc *clientConn) writeResultset(ctx context.Context, rs ResultSet, binary bool, serverStatus uint16, fetchSize int) (runErr error) {
 	defer func() {
+		// query success and have result to return
+		cc.logSql(nil)
+
 		// close ResultSet when cursor doesn't exist
 		if !mysql.HasCursorExistsFlag(serverStatus) {
 			terror.Call(rs.Close)
@@ -1494,4 +1512,150 @@ func (cc *clientConn) handleChangeUser(ctx context.Context, data []byte) error {
 	}
 
 	return cc.writeOK()
+}
+
+type sqlRecord struct {
+	user       string
+	cmdType    string
+	sql        string
+	tbls       string
+	startTime  time.Time
+	endTime    time.Time
+	duration   float64
+	err        error
+	serverAddr string
+	connId     uint32
+
+	affectedRows uint64
+	foundRows    uint64
+	memory       float64
+	execDetails  string
+}
+
+func (cc *clientConn) initLogSql() {
+	store := cc.server.driver.(*TiDBDriver).store
+	session, err := session.CreateSession(store)
+	if err != nil {
+		logutil.Logger(context.Background()).Info("create session for query log error", zap.Error(err))
+	}
+	ctx := context.TODO()
+
+	sql := fmt.Sprintf("select HIGH_PRIORITY user from tidb_monitor.query_log_ignore where user='%s'", cc.user)
+	rs, err := session.Execute(ctx, sql)
+	if err != nil {
+		logutil.Logger(context.Background()).Info("select tidb_monitor.query_log error", zap.Error(err))
+	}
+	if len(rs) > 0 {
+		chunk := rs[0].NewChunk()
+
+		rs[0].Next(ctx, chunk)
+		cc.ignoreLog = chunk.NumRows() == 1
+		for _, r := range rs {
+			r.Close()
+		}
+	}
+
+	serverAddr := cc.bufReadConn.LocalAddr().String()
+	defer session.Close()
+	for {
+		sr, ok := <-cc.sqlCh
+		if !ok {
+			logutil.Logger(context.Background()).Info("close recordSql")
+			return
+		}
+
+		sr.serverAddr = serverAddr
+		sql := sr.ToSql()
+		session.Execute(ctx, sql)
+	}
+}
+
+func (cc *clientConn) saveSqlRecord(r *sqlRecord) {
+	runes := []rune(r.sql)
+	if len(runes) >= 20000 {
+		r.sql = string(runes[:20000])
+	}
+	r.cmdType = strings.ToLower(r.cmdType)
+	r.endTime = time.Now()
+	r.duration = time.Since(r.startTime).Seconds()
+
+	cc.sqlCh <- *r
+}
+
+// toDo should use prepare stmt
+func (s *sqlRecord) ToSql() string {
+	errInfo := ""
+	if s.err != nil {
+		errInfo = strings.Replace(fmt.Sprintf("%s", s.err), "'", "\\'", -1)
+	}
+	format := "2006-01-02 15:04:05"
+	dayFormat := "2006-01-02"
+	hourFormat := "15"
+	str := fmt.Sprintf(`insert into tidb_monitor.query_log 
+                        (user,sql_type,
+						duration,start_time,end_time,start_day,start_hour,
+						sql_info,error_info,
+						tbls,server_addr,conn_id,
+						affect_rows,found_rows,memory_usage,exec_details)
+                values ('%s','%s',
+						%.6f,'%s','%s','%s','%s',
+						'%s','%s','%s','%s','%d',
+						%d,%d,%.2f,'%s'
+						)`,
+		s.user, s.cmdType,
+		s.duration, s.startTime.Format(format), s.endTime.Format(format), s.startTime.Format(dayFormat), s.startTime.Format(hourFormat),
+		strings.Replace(s.sql, "'", "\\'", -1), errInfo,
+		s.tbls, s.serverAddr, s.connId,
+		s.affectedRows, s.foundRows, s.memory, s.execDetails,
+	)
+	return str
+}
+
+func (cc *clientConn) logSql(err error) {
+	if cc.ctx == nil || cc.ctx.GetSessionVars() == nil {
+		if !terror.ErrorEqual(err, io.EOF) {
+			logutil.Logger(context.Background()).Info("get session vars failed", zap.Error(err))
+		}
+		return
+	}
+	ssc := cc.ctx.GetSessionVars().StmtCtx
+
+	if terror.ErrorEqual(err, io.EOF) {
+		err = nil
+	}
+
+	if (ssc.NeedLog || err != nil) && !cc.ignoreLog {
+		if ssc.StartTime.IsZero() {
+			ssc.StartTime = time.Now()
+		}
+		sql := ssc.SqlText
+		if strings.EqualFold(sql, "") {
+			sql = cc.lastCmd
+		}
+
+		sort.Strings(ssc.TableNames)
+		r := sqlRecord{
+			user:    cc.user,
+			cmdType: ssc.StmtType,
+			// Debug 有次sql错误，打印的是上一次的sql
+			// user test;
+			sql:       strings.TrimSpace(sql),
+			startTime: ssc.StartTime,
+			connId:    cc.connectionID,
+			err:       err,
+
+			tbls:         strings.Join(ssc.TableNames, ","),
+			affectedRows: ssc.AffectedRows(),
+			foundRows:    ssc.FoundRows(),
+			memory:       ssc.MemTracker.BytesToKb(),
+			execDetails:  ssc.GetExecDetails().String(),
+		}
+
+		if r.sql == "" {
+			r.sql = cc.lastCmd
+		}
+
+		ssc.SqlText = ""
+		cc.saveSqlRecord(&r)
+	}
 }

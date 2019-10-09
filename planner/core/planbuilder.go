@@ -788,7 +788,7 @@ func (b *PlanBuilder) buildPhysicalIndexLookUpReader(ctx context.Context, dbName
 	}.Init(b.ctx)
 	is.stats = property.NewSimpleStats(0)
 	// It's double read case.
-	ts := PhysicalTableScan{Columns: tblReaderCols, Table: is.Table}.Init(b.ctx)
+	ts := PhysicalTableScan{Columns: tblReaderCols, Table: is.Table, DBName: is.DBName}.Init(b.ctx)
 	ts.SetSchema(tblSchema)
 	cop := &copTask{indexPlan: is, tablePlan: ts}
 	ts.HandleIdx = pkOffset

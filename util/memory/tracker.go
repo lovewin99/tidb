@@ -221,3 +221,14 @@ func (t *Tracker) BytesToString(numBytes int64) string {
 
 	return fmt.Sprintf("%v Bytes", numBytes)
 }
+
+// for query_log
+func (t *Tracker) BytesToKb() float64 {
+	n := t.bytesConsumed
+	kb := float64(n) / float64(1<<10)
+	if kb > 1 {
+		return kb
+	}
+	return 0
+}
+

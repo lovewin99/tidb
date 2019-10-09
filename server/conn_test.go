@@ -153,6 +153,7 @@ func (ts ConnTestSuite) TestInitialHandshake(c *C) {
 		pkt: &packetIO{
 			bufWriter: bufio.NewWriter(&outBuffer),
 		},
+		sqlCh: make(chan sqlRecord, 100),
 	}
 	err := cc.writeInitialHandshake()
 	c.Assert(err, IsNil)
@@ -238,6 +239,7 @@ func (ts ConnTestSuite) TestConnExecutionTimeout(c *C) {
 		},
 		ctx:   tc,
 		alloc: arena.NewAllocator(32 * 1024),
+		sqlCh: make(chan sqlRecord, 100),
 	}
 	srv := &Server{
 		clients: map[uint32]*clientConn{

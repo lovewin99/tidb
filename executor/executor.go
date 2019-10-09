@@ -1517,6 +1517,14 @@ func ResetContextOfStmt(ctx sessionctx.Context, s ast.StmtNode) (err error) {
 	} else if vars.StmtCtx.InSelectStmt {
 		sc.PrevAffectedRows = -1
 	}
+
+	// for query_log
+	tblExtractor := sqlTblNameExtractor{tbls: make(map[string]bool), currentDB: vars.CurrentDB}
+	s.Accept(&tblExtractor)
+	for k, _ := range tblExtractor.tbls {
+		sc.TableNames = append(sc.TableNames, k)
+	}
+
 	errCount, warnCount := vars.StmtCtx.NumErrorWarnings()
 	err = vars.SetSystemVar("warning_count", warnCount)
 	if err != nil {
@@ -1529,3 +1537,28 @@ func ResetContextOfStmt(ctx sessionctx.Context, s ast.StmtNode) (err error) {
 	vars.StmtCtx = sc
 	return
 }
+
+// for query_log
+type sqlTblNameExtractor struct {
+	tbls      map[string]bool
+	currentDB string
+}
+
+func (s *sqlTblNameExtractor) Enter(in ast.Node) (out ast.Node, skipChildren bool) {
+	if in != nil {
+		switch n := in.(type) {
+		case *ast.TableName:
+			db := n.Schema.L
+			if db == "" {
+				db = s.currentDB
+			}
+			s.tbls[fmt.Sprintf("`%s`.`%s`", db, n.Name.L)] = true
+		}
+	}
+	return in, false
+}
+
+func (s *sqlTblNameExtractor) Leave(in ast.Node) (out ast.Node, ok bool) {
+	return in, true
+}
+

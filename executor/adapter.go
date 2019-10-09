@@ -262,19 +262,41 @@ func (a *ExecStmt) Exec(ctx context.Context) (_ sqlexec.RecordSet, err error) {
 
 	cmd32 := atomic.LoadUint32(&sctx.GetSessionVars().CommandValue)
 	cmd := byte(cmd32)
+
+	sql := a.OriginText()
+	if simple, ok := a.Plan.(*plannercore.Simple); ok && simple.Statement != nil {
+		if ss, ok := simple.Statement.(ast.SensitiveStmtNode); ok {
+			// Use SecureText to avoid leak password information.
+			sql = ss.SecureText()
+		}
+	}
+
 	var pi processinfoSetter
 	if raw, ok := sctx.(processinfoSetter); ok {
 		pi = raw
-		sql := a.OriginText()
-		if simple, ok := a.Plan.(*plannercore.Simple); ok && simple.Statement != nil {
-			if ss, ok := simple.Statement.(ast.SensitiveStmtNode); ok {
-				// Use SecureText to avoid leak password information.
-				sql = ss.SecureText()
-			}
-		}
 		maxExecutionTime := getMaxExecutionTime(sctx, a.StmtNode)
 		// Update processinfo, ShowProcess() will use it.
 		pi.SetProcessInfo(sql, time.Now(), cmd, maxExecutionTime)
+
+		// for query_log
+		stmtCtx := a.Ctx.GetSessionVars().StmtCtx
+		stmtCtx.SqlText = sql
+		stmtCtx.StartTime = time.Now()
+
+		needLog := false
+		switch nt := a.StmtNode.(type) {
+		case *ast.SelectStmt:
+			if nt.From != nil {
+				needLog = true
+			}
+		case *ast.CreateDatabaseStmt, *ast.CreateIndexStmt, *ast.CreateTableStmt, *ast.CreateUserStmt, *ast.CreateViewStmt,
+		*ast.DropDatabaseStmt, *ast.DropIndexStmt, *ast.DropTableStmt, *ast.DropUserStmt,
+		*ast.AlterTableStmt, *ast.RenameTableStmt, *ast.TruncateTableStmt, *ast.AlterUserStmt, *ast.UpdateStmt,
+		*ast.DeleteStmt, *ast.LoadDataStmt, *ast.InsertStmt, *ast.GrantStmt:
+			needLog = true
+		}
+		stmtCtx.NeedLog = needLog
+
 		if a.Ctx.GetSessionVars().StmtCtx.StmtType == "" {
 			a.Ctx.GetSessionVars().StmtCtx.StmtType = GetStmtLabel(a.StmtNode)
 		}
