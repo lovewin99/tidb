@@ -1662,6 +1662,7 @@ func finishBootstrap(store kv.Storage) {
 const quoteCommaQuote = "', '"
 
 var builtinGlobalVariable = []string{
+	variable.FinupColumnNumLimit,
 	variable.AutoCommit,
 	variable.SQLModeVar,
 	variable.MaxAllowedPacket,

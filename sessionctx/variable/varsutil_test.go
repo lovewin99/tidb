@@ -57,6 +57,7 @@ func (s *testVarsutilSuite) TestNewSessionVars(c *C) {
 	defer testleak.AfterTest(c)()
 	vars := NewSessionVars()
 
+	c.Assert(vars.ColumnNumLimit, Equals, DefColumnNumLimit)
 	c.Assert(vars.IndexJoinBatchSize, Equals, DefIndexJoinBatchSize)
 	c.Assert(vars.IndexLookupSize, Equals, DefIndexLookupSize)
 	c.Assert(vars.IndexLookupConcurrency, Equals, DefIndexLookupConcurrency)

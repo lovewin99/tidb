@@ -307,6 +307,9 @@ type SessionVars struct {
 
 	/* TiDB system variables */
 
+	// finup default 512
+	ColumnNumLimit int
+
 	// LightningMode is true when the lightning use the kvencoder to transfer sql to raw kv.
 	LightningMode bool
 
@@ -470,6 +473,7 @@ func NewSessionVars() *SessionVars {
 		WaitSplitRegionFinish:       DefTiDBWaitSplitRegionFinish,
 		WaitSplitRegionTimeout:      DefWaitSplitRegionTimeout,
 		AllowRemoveAutoInc:          DefTiDBAllowRemoveAutoInc,
+		ColumnNumLimit:				 DefColumnNumLimit,
 	}
 	vars.Concurrency = Concurrency{
 		IndexLookupConcurrency:     DefIndexLookupConcurrency,
@@ -666,6 +670,8 @@ func (s *SessionVars) WithdrawAllPreparedStmt() {
 // SetSystemVar sets the value of a system variable.
 func (s *SessionVars) SetSystemVar(name string, val string) error {
 	switch name {
+	case FinupColumnNumLimit:
+		s.ColumnNumLimit = tidbOptPositiveInt32(val, DefColumnNumLimit)
 	case TxnIsolationOneShot:
 		switch val {
 		case "SERIALIZABLE", "READ-UNCOMMITTED":

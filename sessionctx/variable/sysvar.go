@@ -127,6 +127,7 @@ func BoolToInt32(b bool) int32 {
 
 // we only support MySQL now
 var defaultSysVars = []*SysVar{
+	{ScopeGlobal | ScopeSession, FinupColumnNumLimit, strconv.Itoa(DefIndexLookupSize)},
 	{ScopeGlobal, "gtid_mode", "OFF"},
 	{ScopeGlobal, FlushTime, "0"},
 	{ScopeSession, PseudoSlaveMode, ""},

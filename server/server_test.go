@@ -729,7 +729,8 @@ func runTestErrorCode(c *C) {
 		// Make tests stable. Some times the error may be the ErrInfoSchemaChanged.
 		checkErrorCode(c, err, tmysql.ErrDBCreateExists, tmysql.ErrUnknown)
 		_, err = txn2.Exec("create database aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa;")
-		checkErrorCode(c, err, tmysql.ErrTooLongIdent, tmysql.ErrUnknown)
+		//checkErrorCode(c, err, tmysql.ErrTooLongIdent, tmysql.ErrUnknown)
+		c.Assert(err, IsNil)
 		_, err = txn2.Exec("create table test (c int);")
 		checkErrorCode(c, err, tmysql.ErrTableExists, tmysql.ErrUnknown)
 		_, err = txn2.Exec("drop table unknown_table;")
@@ -737,11 +738,14 @@ func runTestErrorCode(c *C) {
 		_, err = txn2.Exec("drop database unknown_db;")
 		checkErrorCode(c, err, tmysql.ErrDBDropExists, tmysql.ErrUnknown)
 		_, err = txn2.Exec("create table aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa (a int);")
-		checkErrorCode(c, err, tmysql.ErrTooLongIdent, tmysql.ErrUnknown)
+		//checkErrorCode(c, err, tmysql.ErrTooLongIdent, tmysql.ErrUnknown)
+		c.Assert(err, IsNil)
 		_, err = txn2.Exec("create table long_column_table (aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa int);")
-		checkErrorCode(c, err, tmysql.ErrTooLongIdent, tmysql.ErrUnknown)
+		//checkErrorCode(c, err, tmysql.ErrTooLongIdent, tmysql.ErrUnknown)
+		c.Assert(err, IsNil)
 		_, err = txn2.Exec("alter table test add aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa int;")
-		checkErrorCode(c, err, tmysql.ErrTooLongIdent, tmysql.ErrUnknown)
+		//checkErrorCode(c, err, tmysql.ErrTooLongIdent, tmysql.ErrUnknown)
+		c.Assert(err, IsNil)
 
 		// Optimizer errors
 		_, err = txn2.Exec("select *, * from test;")

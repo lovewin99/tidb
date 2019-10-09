@@ -169,23 +169,26 @@ func (d *ddl) DropSchema(ctx sessionctx.Context, schema model.CIStr) (err error)
 }
 
 func checkTooLongSchema(schema model.CIStr) error {
-	if len(schema.L) > mysql.MaxDatabaseNameLength {
-		return ErrTooLongIdent.GenWithStackByArgs(schema)
-	}
+	// 取消限制
+	//if len(schema.L) > mysql.MaxDatabaseNameLength {
+	//	return ErrTooLongIdent.GenWithStackByArgs(schema)
+	//}
 	return nil
 }
 
 func checkTooLongTable(table model.CIStr) error {
-	if len(table.L) > mysql.MaxTableNameLength {
-		return ErrTooLongIdent.GenWithStackByArgs(table)
-	}
+	// 取消限制
+	//if len(table.L) > mysql.MaxTableNameLength {
+	//	return ErrTooLongIdent.GenWithStackByArgs(table)
+	//}
 	return nil
 }
 
 func checkTooLongIndex(index model.CIStr) error {
-	if len(index.L) > mysql.MaxIndexIdentifierLen {
-		return ErrTooLongIdent.GenWithStackByArgs(index)
-	}
+	// 取消限制
+	//if len(index.L) > mysql.MaxIndexIdentifierLen {
+	//	return ErrTooLongIdent.GenWithStackByArgs(index)
+	//}
 	return nil
 }
 
@@ -866,22 +869,32 @@ func checkGeneratedColumn(colDefs []*ast.ColumnDef) error {
 }
 
 func checkTooLongColumn(cols []interface{}) error {
-	var colName string
-	for _, col := range cols {
-		switch x := col.(type) {
-		case *ast.ColumnDef:
-			colName = x.Name.Name.O
-		case model.CIStr:
-			colName = x.O
-		default:
-			colName = ""
-		}
-		if len(colName) > mysql.MaxColumnNameLength {
-			return ErrTooLongIdent.GenWithStackByArgs(colName)
-		}
+	// 取消限制
+	//var colName string
+	//for _, col := range cols {
+	//	switch x := col.(type) {
+	//	case *ast.ColumnDef:
+	//		colName = x.Name.Name.O
+	//	case model.CIStr:
+	//		colName = x.O
+	//	default:
+	//		colName = ""
+	//	}
+	//	if len(colName) > mysql.MaxColumnNameLength {
+	//		return ErrTooLongIdent.GenWithStackByArgs(colName)
+	//	}
+	//}
+	return nil
+}
+
+func checkFinupTooManyColumns(ctx sessionctx.Context, colDefs []*ast.ColumnDef) error {
+	if len(colDefs) > ctx.GetSessionVars().ColumnNumLimit {
+		return errTooManyFields
 	}
 	return nil
 }
+
+
 
 func checkTooManyColumns(colDefs []*ast.ColumnDef) error {
 	if uint32(len(colDefs)) > atomic.LoadUint32(&TableColumnCountLimit) {
@@ -1232,7 +1245,7 @@ func buildTableInfoWithCheck(ctx sessionctx.Context, d *ddl, s *ast.CreateTableS
 	if err := checkTooLongColumn(colObjects); err != nil {
 		return nil, errors.Trace(err)
 	}
-	if err := checkTooManyColumns(colDefs); err != nil {
+	if err := checkFinupTooManyColumns(ctx, colDefs); err != nil {
 		return nil, errors.Trace(err)
 	}
 
@@ -2082,9 +2095,9 @@ func (d *ddl) AddColumn(ctx sessionctx.Context, ti ast.Ident, spec *ast.AlterTab
 		}
 	}
 
-	if len(colName) > mysql.MaxColumnNameLength {
-		return ErrTooLongIdent.GenWithStackByArgs(colName)
-	}
+	//if len(colName) > mysql.MaxColumnNameLength {
+	//	return ErrTooLongIdent.GenWithStackByArgs(colName)
+	//}
 
 	// Ignore table constraints now, maybe return error later.
 	// We use length(t.Cols()) as the default offset firstly, we will change the

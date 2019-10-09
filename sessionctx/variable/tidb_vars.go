@@ -149,6 +149,7 @@ const (
 
 // TiDB system variable names that both in session and global scope.
 const (
+	FinupColumnNumLimit = "finup_column_num_limit"
 	// tidb_build_stats_concurrency is used to speed up the ANALYZE statement, when a table has multiple indices,
 	// those indices can be scanned concurrently, with the cost of higher system performance impact.
 	TiDBBuildStatsConcurrency = "tidb_build_stats_concurrency"
@@ -291,6 +292,7 @@ const (
 
 // Default TiDB system variable values.
 const (
+	DefColumnNumLimit                  = 512
 	DefHostname                        = "localhost"
 	DefIndexLookupConcurrency          = 4
 	DefIndexLookupJoinConcurrency      = 4
