@@ -2714,3 +2714,20 @@ func (s *testSessionSuite) TestGrantViewRelated(c *C) {
 	tkUser.MustQuery("select current_user();").Check(testkit.Rows("u_version29@%"))
 	tkUser.MustExec("create view v_version29_c as select * from v_version29;")
 }
+
+func (t *testSessionSuite) TestCreateTableLikeSelect(c *C) {
+	tk := testkit.NewTestKit(c, t.store)
+	tk.MustExec("use test")
+	tk.MustExec("create table t (id int,name varchar(64))")
+	tk.MustExec("insert t (id,name) values (1,'a')")
+	tk.MustExec("create table t_like like select name from t")
+
+	tblDesc := [][]interface{}{
+		{
+			"name", "varchar(64)", "YES", "", nil, "",
+		},
+	}
+
+	tk.MustQuery("desc t_like").Check(tblDesc)
+}
+

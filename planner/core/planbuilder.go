@@ -2047,6 +2047,28 @@ func (b *PlanBuilder) buildDDL(ctx context.Context, node ast.DDLNode) (Plan, err
 			b.visitInfo = appendVisitInfo(b.visitInfo, mysql.SelectPriv, v.ReferTable.Schema.L,
 				v.ReferTable.Name.L, "", authErr)
 		}
+		if v.Cols == nil && v.SelectStmt != nil {
+			lp, err := b.buildSelect(ctx, v.SelectStmt)
+			if err != nil {
+				return nil, err
+			}
+			columns := lp.Schema().Columns
+			for _, c := range columns {
+				rt := c.RetType
+
+				v.Cols = append(v.Cols, &ast.ColumnDef{
+					Name: &ast.ColumnName{Name: c.ColName},
+					Tp: &types.FieldType{
+						Tp:      rt.Tp,
+						Flen:    rt.Flen,
+						Decimal: rt.Decimal,
+						Charset: rt.Charset,
+						Collate: rt.Collate,
+						Elems:   rt.Elems,
+					},
+				})
+			}
+		}
 	case *ast.CreateViewStmt:
 		plan, err := b.Build(ctx, v.Select)
 		if err != nil {
