@@ -39,6 +39,8 @@ import (
 )
 
 var (
+	_ functionClass = &finupEncryptFunctionClass{}
+	_ functionClass = &finupDecryptFunctionClass{}
 	_ functionClass = &aesDecryptFunctionClass{}
 	_ functionClass = &aesEncryptFunctionClass{}
 	_ functionClass = &compressFunctionClass{}
@@ -59,6 +61,8 @@ var (
 )
 
 var (
+	_ builtinFunc = &builtinFinupEncryptSig{}
+	_ builtinFunc = &builtinFinupDecryptSig{}
 	_ builtinFunc = &builtinAesDecryptSig{}
 	_ builtinFunc = &builtinAesDecryptIVSig{}
 	_ builtinFunc = &builtinAesEncryptSig{}
@@ -901,4 +905,110 @@ type validatePasswordStrengthFunctionClass struct {
 
 func (c *validatePasswordStrengthFunctionClass) getFunction(ctx sessionctx.Context, args []Expression) (builtinFunc, error) {
 	return nil, errFunctionNotExists.GenWithStackByArgs("FUNCTION", "VALIDATE_PASSWORD_STRENGTH")
+}
+
+const (
+	finupKey = "fc07d382b5475798"
+	finupIv  = "b5475798f71dc641"
+)
+
+// finup encrypt
+type finupEncryptFunctionClass struct {
+	baseFunctionClass
+}
+
+func (c *finupEncryptFunctionClass) getFunction(ctx sessionctx.Context, args []Expression) (builtinFunc, error) {
+	if err := c.verifyArgs(args); err != nil {
+		return nil, errors.Trace(c.verifyArgs(args))
+	}
+	bf := newBaseBuiltinFuncWithTp(ctx, args, types.ETString, types.ETString)
+	bf.tp.Flen = args[0].GetType().Flen
+	types.SetBinChsClnFlag(bf.tp)
+	sig := &builtinFinupEncryptSig{bf}
+	return sig, nil
+}
+
+type builtinFinupEncryptSig struct {
+	baseBuiltinFunc
+}
+
+func (b *builtinFinupEncryptSig) Clone() builtinFunc {
+	newSig := &builtinFinupEncryptSig{}
+	newSig.cloneFrom(&b.baseBuiltinFunc)
+	return newSig
+}
+
+// evalString evals encrypt_string(str).
+func (b *builtinFinupEncryptSig) evalString(row chunk.Row) (string, bool, error) {
+	str, isNull, err := b.args[0].EvalString(b.ctx, row)
+	if isNull || err != nil {
+		return "", true, errors.Trace(err)
+	}
+
+	if "xy" == string([]byte(str)[:2]) {
+		return str, false, nil
+	}
+
+	tres, err := encrypt.Encrypt([]byte(str), []byte(finupKey), []byte(finupIv))
+
+	res := encrypt.ByteToHexString(tres)
+
+	if err != nil {
+		return str, true, errors.Trace(err)
+	}
+
+	buf := bytes.Buffer{}
+	buf.WriteString("xy")
+	buf.WriteString(res)
+	buf.WriteString("20160926")
+
+	return buf.String(), false, nil
+}
+
+// finup decrypt
+type finupDecryptFunctionClass struct {
+	baseFunctionClass
+}
+
+func (c *finupDecryptFunctionClass) getFunction(ctx sessionctx.Context, args []Expression) (builtinFunc, error) {
+	if err := c.verifyArgs(args); err != nil {
+		return nil, errors.Trace(c.verifyArgs(args))
+	}
+	bf := newBaseBuiltinFuncWithTp(ctx, args, types.ETString, types.ETString)
+	bf.tp.Flen = args[0].GetType().Flen
+	types.SetBinChsClnFlag(bf.tp)
+	sig := &builtinFinupDecryptSig{bf}
+	return sig, nil
+}
+
+type builtinFinupDecryptSig struct {
+	baseBuiltinFunc
+}
+
+func (b *builtinFinupDecryptSig) Clone() builtinFunc {
+	newSig := &builtinFinupDecryptSig{}
+	newSig.cloneFrom(&b.baseBuiltinFunc)
+	return newSig
+}
+
+// evalString evals decrypt_string(str).
+func (b *builtinFinupDecryptSig) evalString(row chunk.Row) (string, bool, error) {
+	str, isNull, err := b.args[0].EvalString(b.ctx, row)
+	if isNull || err != nil {
+		return "", true, errors.Trace(err)
+	}
+
+	if "xy" != string([]byte(str)[:2]) {
+		return str, false, nil
+	}
+
+	tstr := string([]byte(str)[:len(str)-8][2:])
+
+	res, err := encrypt.Decrypt(encrypt.HexStringToByte(tstr), []byte(finupKey), []byte(finupIv))
+
+	if err != nil {
+		return str, false, nil
+	}
+
+	return string(res), false, nil
 }

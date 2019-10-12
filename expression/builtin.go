@@ -556,6 +556,8 @@ var funcs = map[string]functionClass{
 	ast.GetParam:   &getParamFunctionClass{baseFunctionClass{ast.GetParam, 1, 1}},
 
 	// encryption and compression functions
+	ast.FinupEncrypt:             &finupEncryptFunctionClass{baseFunctionClass{ast.FinupEncrypt, 1, 1}},
+	ast.FinupDecrypt:             &finupDecryptFunctionClass{baseFunctionClass{ast.FinupDecrypt, 1, 1}},
 	ast.AesDecrypt:               &aesDecryptFunctionClass{baseFunctionClass{ast.AesDecrypt, 2, 3}},
 	ast.AesEncrypt:               &aesEncryptFunctionClass{baseFunctionClass{ast.AesEncrypt, 2, 3}},
 	ast.Compress:                 &compressFunctionClass{baseFunctionClass{ast.Compress, 1, 1}},
