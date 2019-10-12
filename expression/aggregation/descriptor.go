@@ -146,7 +146,7 @@ func (a *AggFuncDesc) EvalNullValueInOuterJoin(ctx sessionctx.Context, schema *e
 	case ast.AggFuncCount:
 		return a.evalNullValueInOuterJoin4Count(ctx, schema)
 	case ast.AggFuncSum, ast.AggFuncMax, ast.AggFuncMin,
-		ast.AggFuncFirstRow:
+		ast.AggFuncFirstRow, ast.AggFuncStddevPop, ast.AggFuncStddevSamp:
 		return a.evalNullValueInOuterJoin4Sum(ctx, schema)
 	case ast.AggFuncAvg, ast.AggFuncGroupConcat:
 		return types.Datum{}, false

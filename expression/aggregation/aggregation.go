@@ -227,14 +227,15 @@ func (af *aggFunction) Clone(ctx sessionctx.Context) Aggregation {
 
 // NeedCount indicates whether the aggregate function should record count.
 func NeedCount(name string) bool {
-	return name == ast.AggFuncCount || name == ast.AggFuncAvg
+	return name == ast.AggFuncCount || name == ast.AggFuncAvg ||
+		name == ast.AggFuncStddevPop || name == ast.AggFuncStddevSamp
 }
 
 // NeedValue indicates whether the aggregate function should record value.
 func NeedValue(name string) bool {
 	switch name {
 	case ast.AggFuncSum, ast.AggFuncAvg, ast.AggFuncFirstRow, ast.AggFuncMax, ast.AggFuncMin,
-		ast.AggFuncGroupConcat, ast.AggFuncBitOr, ast.AggFuncBitAnd, ast.AggFuncBitXor:
+		ast.AggFuncGroupConcat, ast.AggFuncBitOr, ast.AggFuncBitAnd, ast.AggFuncBitXor, ast.AggFuncStddevSamp, ast.AggFuncStddevPop:
 		return true
 	default:
 		return false

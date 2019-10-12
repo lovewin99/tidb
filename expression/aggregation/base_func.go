@@ -88,7 +88,7 @@ func (a *baseFuncDesc) typeInfer(ctx sessionctx.Context) error {
 		a.typeInfer4Count(ctx)
 	case ast.AggFuncSum:
 		a.typeInfer4Sum(ctx)
-	case ast.AggFuncAvg:
+	case ast.AggFuncAvg, ast.AggFuncStddevPop, ast.AggFuncStddevSamp:
 		a.typeInfer4Avg(ctx)
 	case ast.AggFuncGroupConcat:
 		a.typeInfer4GroupConcat(ctx)

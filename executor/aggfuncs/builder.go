@@ -51,6 +51,13 @@ func Build(ctx sessionctx.Context, aggFuncDesc *aggregation.AggFuncDesc, ordinal
 		return buildBitXor(aggFuncDesc, ordinal)
 	case ast.AggFuncBitAnd:
 		return buildBitAnd(aggFuncDesc, ordinal)
+	case ast.AggFuncStddevPop:
+		return buildStd(aggFuncDesc, ordinal, false)
+	case ast.AggFuncStddevSamp:
+		return buildStd(aggFuncDesc, ordinal, true)
+	default:
+		fmt.Printf("unsupport function %s\n", aggFuncDesc.Name)
+
 	}
 	return nil
 }
@@ -152,6 +159,27 @@ func buildSum(aggFuncDesc *aggregation.AggFuncDesc, ordinal int) AggFunc {
 				return &sum4DistinctFloat64{base}
 			}
 			return &sum4Float64{base}
+		}
+	}
+}
+
+func buildStd(aggFuncDesc *aggregation.AggFuncDesc, ordinal int, isSamp bool) AggFunc {
+	base := baseStdAggFunc{
+		baseAggFunc: baseAggFunc{
+			args:    aggFuncDesc.Args,
+			ordinal: ordinal,
+		},
+	}
+
+	switch aggFuncDesc.Mode {
+	case aggregation.DedupMode:
+		return nil
+	default:
+		switch aggFuncDesc.RetTp.EvalType() {
+		case types.ETDecimal:
+			return &std4Decimal{base, isSamp, aggFuncDesc.HasDistinct}
+		default:
+			return &std4Float64{base, isSamp, aggFuncDesc.HasDistinct}
 		}
 	}
 }

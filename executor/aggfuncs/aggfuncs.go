@@ -69,6 +69,10 @@ var (
 	_ AggFunc = (*sum4Decimal)(nil)
 	_ AggFunc = (*sum4Float64)(nil)
 
+	// All the AggFunc implementations for "STD" are listed here.
+	_ AggFunc = (*std4Float64)(nil)
+	_ AggFunc = (*std4Decimal)(nil)
+
 	// All the AggFunc implementations for "GROUP_CONCAT" are listed here.
 	_ AggFunc = (*groupConcatDistinct)(nil)
 	_ AggFunc = (*groupConcat)(nil)
