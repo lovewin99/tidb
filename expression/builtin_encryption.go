@@ -36,6 +36,7 @@ import (
 	"github.com/pingcap/tidb/types"
 	"github.com/pingcap/tidb/util/chunk"
 	"github.com/pingcap/tidb/util/encrypt"
+	. "math"
 )
 
 var (
@@ -905,6 +906,135 @@ type validatePasswordStrengthFunctionClass struct {
 
 func (c *validatePasswordStrengthFunctionClass) getFunction(ctx sessionctx.Context, args []Expression) (builtinFunc, error) {
 	return nil, errFunctionNotExists.GenWithStackByArgs("FUNCTION", "VALIDATE_PASSWORD_STRENGTH")
+}
+
+type rateFunctionClass struct {
+	baseFunctionClass
+}
+
+func (c *rateFunctionClass) getFunction(ctx sessionctx.Context, args []Expression) (builtinFunc, error) {
+	if err := c.verifyArgs(args); err != nil {
+		return nil, errors.Trace(c.verifyArgs(args))
+	}
+	bf := newBaseBuiltinFuncWithTp(ctx, args, types.ETReal, types.ETInt, types.ETReal, types.ETReal)
+	bf.tp.Flen = args[0].GetType().Flen
+	types.SetBinChsClnFlag(bf.tp)
+	sig := &builtinRateSig{bf}
+	return sig, nil
+}
+
+type builtinRateSig struct {
+	baseBuiltinFunc
+}
+
+func (b *builtinRateSig) Clone() builtinFunc {
+	newSig := &builtinRateSig{}
+	newSig.cloneFrom(&b.baseBuiltinFunc)
+	return newSig
+}
+
+func (b *builtinRateSig) evalReal(row chunk.Row) (float64, bool, error) {
+
+	av, isNull, err := b.args[0].EvalInt(b.ctx, row)
+	if isNull || err != nil {
+		return 0, true, errors.Trace(err)
+	}
+
+	bv, isNull, err := b.args[1].EvalReal(b.ctx, row)
+	if isNull || err != nil {
+		return 0, true, errors.Trace(err)
+	}
+
+	cv, isNull, err := b.args[2].EvalReal(b.ctx, row)
+	if isNull || err != nil {
+		return 0, true, errors.Trace(err)
+	}
+
+	v := rate(av, bv, cv)
+	return v, false, nil
+}
+
+func rate(period int64, pmt, pv float64) float64 {
+	npv := func(pmt, r float64, period int64) (ret float64) {
+		for period > 0 {
+			x := -float64(period)
+			ret = ret + Pow(1+r, x)*pmt
+			period = period - 1
+		}
+		return
+	}
+
+	var (
+		low  = 0.0
+		high = 0.8
+		mid  = (low + high) / 2
+	)
+	count := 0
+	ebar := npv(pmt, mid, period) + pv
+	for Abs(ebar) > 0.0000001 {
+		if ebar < 0 {
+			high = mid
+		} else {
+			low = mid
+		}
+		mid = (low + high) / 2
+		ebar = npv(pmt, mid, period) + pv
+		if count > 1000 {
+			break
+		}
+		count += 1
+	}
+	return mid
+}
+
+type pmtFunctionClass struct {
+	baseFunctionClass
+}
+
+func (c *pmtFunctionClass) getFunction(ctx sessionctx.Context, args []Expression) (builtinFunc, error) {
+	if err := c.verifyArgs(args); err != nil {
+		return nil, errors.Trace(c.verifyArgs(args))
+	}
+	bf := newBaseBuiltinFuncWithTp(ctx, args, types.ETReal, types.ETReal, types.ETReal, types.ETReal)
+	bf.tp.Flen = args[0].GetType().Flen
+	types.SetBinChsClnFlag(bf.tp)
+	sig := &builtinPmtSig{bf}
+	return sig, nil
+}
+
+type builtinPmtSig struct {
+	baseBuiltinFunc
+}
+
+func (b *builtinPmtSig) Clone() builtinFunc {
+	newSig := &builtinPmtSig{}
+	newSig.cloneFrom(&b.baseBuiltinFunc)
+	return newSig
+}
+
+func (b *builtinPmtSig) evalReal(row chunk.Row) (float64, bool, error) {
+	av, isNull, err := b.args[0].EvalReal(b.ctx, row)
+	if isNull || err != nil {
+		return 0, true, errors.Trace(err)
+	}
+
+	bv, isNull, err := b.args[1].EvalReal(b.ctx, row)
+	if isNull || err != nil {
+		return 0, true, errors.Trace(err)
+	}
+
+	cv, isNull, err := b.args[2].EvalReal(b.ctx, row)
+	if isNull || err != nil {
+		return 0, true, errors.Trace(err)
+	}
+	v := pmt(av, bv, cv)
+	return v, false, nil
+}
+
+func pmt(rate, term, financeAmount float64) float64 {
+	t := -term
+	result := (financeAmount * rate) / (1 - Pow(rate+1, t))
+	return result
 }
 
 const (

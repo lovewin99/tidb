@@ -297,6 +297,7 @@ func (pc PbConverter) canFuncBePushed(sf *ScalarFunction) bool {
 		ast.Minus,
 		ast.Mul,
 		ast.Div,
+		ast.REALDIV,
 		ast.Abs,
 		ast.Ceil,
 		ast.Ceiling,

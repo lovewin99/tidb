@@ -122,6 +122,8 @@ github.com/lovewin99/parser v0.0.0-20191009103939-ca57f86dd1af h1:JiAYugsrJW3N19
 github.com/lovewin99/parser v0.0.0-20191009103939-ca57f86dd1af/go.mod h1:HV9hMhwERSujCPjsp2bhL4IWCkpMrXR/UlS+ZMDo5Qw=
 github.com/lovewin99/parser v0.0.0-20191012073336-bfb56ecb37c6 h1:Dtl4szq797V4hPcDNgVbsyetySvm1yBRtg4nHr40lpM=
 github.com/lovewin99/parser v0.0.0-20191012073336-bfb56ecb37c6/go.mod h1:HV9hMhwERSujCPjsp2bhL4IWCkpMrXR/UlS+ZMDo5Qw=
+github.com/lovewin99/parser v0.0.0-20191012084525-fe79dd8cb2d1 h1:q1vNAQTFLdyCqHuvy21EBtumt4+XHVQ8XMmCKcaknCU=
+github.com/lovewin99/parser v0.0.0-20191012084525-fe79dd8cb2d1/go.mod h1:HV9hMhwERSujCPjsp2bhL4IWCkpMrXR/UlS+ZMDo5Qw=
 github.com/mattn/go-colorable v0.0.9/go.mod h1:9vuHe8Xs5qXnSaW/c/ABM9alt+Vo+STaOChaDxuIBZU=
 github.com/mattn/go-isatty v0.0.4/go.mod h1:M+lRXTBqGeGNdLjl/ufCoiOlB5xdOkqRJdNxMWT7Zi4=
 github.com/mattn/go-runewidth v0.0.2/go.mod h1:LwmH8dsx7+W8Uxz3IHJYH5QSwggIsqBzpuz5H//U1FU=

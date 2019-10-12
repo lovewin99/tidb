@@ -532,6 +532,7 @@ var funcs = map[string]functionClass{
 	ast.Plus:       &arithmeticPlusFunctionClass{baseFunctionClass{ast.Plus, 2, 2}},
 	ast.Minus:      &arithmeticMinusFunctionClass{baseFunctionClass{ast.Minus, 2, 2}},
 	ast.Mod:        &arithmeticModFunctionClass{baseFunctionClass{ast.Mod, 2, 2}},
+	ast.REALDIV:    &arithmeticBigDivideFunctionClass{baseFunctionClass{ast.REALDIV, 2, 2}},
 	ast.Div:        &arithmeticDivideFunctionClass{baseFunctionClass{ast.Div, 2, 2}},
 	ast.Mul:        &arithmeticMultiplyFunctionClass{baseFunctionClass{ast.Mul, 2, 2}},
 	ast.IntDiv:     &arithmeticIntDivideFunctionClass{baseFunctionClass{ast.IntDiv, 2, 2}},
@@ -556,6 +557,8 @@ var funcs = map[string]functionClass{
 	ast.GetParam:   &getParamFunctionClass{baseFunctionClass{ast.GetParam, 1, 1}},
 
 	// encryption and compression functions
+	ast.Rate:                     &rateFunctionClass{baseFunctionClass{ast.Rate, 3, 3}},
+	ast.Pmt:                      &pmtFunctionClass{baseFunctionClass{ast.Pmt, 3, 3}},
 	ast.FinupEncrypt:             &finupEncryptFunctionClass{baseFunctionClass{ast.FinupEncrypt, 1, 1}},
 	ast.FinupDecrypt:             &finupDecryptFunctionClass{baseFunctionClass{ast.FinupDecrypt, 1, 1}},
 	ast.AesDecrypt:               &aesDecryptFunctionClass{baseFunctionClass{ast.AesDecrypt, 2, 3}},

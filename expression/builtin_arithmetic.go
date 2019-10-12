@@ -122,6 +122,37 @@ func setFlenDecimal4RealOrDecimal(retTp, a, b *types.FieldType, isReal bool, isM
 	}
 }
 
+func (c *arithmeticBigDivideFunctionClass) setType4DivDecimal(retTp, a, b *types.FieldType) {
+	retTp.Flen = mysql.MaxDecimalWidth
+	/*
+		var deca, decb = a.Decimal, b.Decimal
+		if deca == types.UnspecifiedFsp {
+			deca = 0
+		}
+		if decb == types.UnspecifiedFsp {
+			decb = 0
+		}
+		retTp.Decimal = deca + precIncrement
+		if retTp.Decimal > mysql.MaxDecimalScale {
+			retTp.Decimal = mysql.MaxDecimalScale
+		}
+		if a.Flen == types.UnspecifiedLength {
+			retTp.Flen = mysql.MaxDecimalWidth
+			return
+		}
+		retTp.Flen = a.Flen + decb + precIncrement
+		if retTp.Flen > mysql.MaxDecimalWidth {
+			retTp.Flen = mysql.MaxDecimalWidth
+		}
+	*/
+}
+
+func (c *arithmeticBigDivideFunctionClass) setType4DivReal(retTp *types.FieldType) {
+	retTp.Decimal = mysql.NotFixedDec
+	retTp.Flen = mysql.MaxRealWidth
+}
+
+
 func (c *arithmeticDivideFunctionClass) setType4DivDecimal(retTp, a, b *types.FieldType) {
 	var deca, decb = a.Decimal, b.Decimal
 	if deca == types.UnspecifiedFsp {
@@ -566,6 +597,47 @@ func (s *builtinArithmeticMultiplyIntSig) evalInt(row chunk.Row) (val int64, isN
 	result := a * b
 	if a != 0 && result/a != b {
 		return 0, true, types.ErrOverflow.GenWithStackByArgs("BIGINT", fmt.Sprintf("(%s * %s)", s.args[0].String(), s.args[1].String()))
+	}
+	return result, false, nil
+}
+
+type arithmeticBigDivideFunctionClass struct {
+	baseFunctionClass
+}
+
+func (c *arithmeticBigDivideFunctionClass) getFunction(ctx sessionctx.Context, args []Expression) (builtinFunc, error) {
+	if err := c.verifyArgs(args); err != nil {
+		return nil, err
+	}
+	bf := newBaseBuiltinFuncWithTp(ctx, args, types.ETReal, types.ETReal, types.ETReal)
+	sig := &builtinArithmeticBigDivideDecimalSig{bf}
+	sig.setPbCode(tipb.ScalarFuncSig_DivideReal) //.ScalarFuncSig_DivideDecimal)
+	return sig, nil
+}
+
+type builtinArithmeticBigDivideDecimalSig struct{ baseBuiltinFunc }
+
+func (s *builtinArithmeticBigDivideDecimalSig) Clone() builtinFunc {
+	newSig := &builtinArithmeticBigDivideDecimalSig{}
+	newSig.cloneFrom(&s.baseBuiltinFunc)
+	return newSig
+}
+
+func (s *builtinArithmeticBigDivideDecimalSig) evalReal(row chunk.Row) (float64, bool, error) {
+	a, isNull, err := s.args[0].EvalReal(s.ctx, row)
+	if isNull || err != nil {
+		return 0, isNull, err
+	}
+	b, isNull, err := s.args[1].EvalReal(s.ctx, row)
+	if isNull || err != nil {
+		return 0, isNull, err
+	}
+	if b == 0 {
+		return 0, true, handleDivisionByZeroError(s.ctx)
+	}
+	result := a / b
+	if math.IsInf(result, 0) {
+		return 0, true, types.ErrOverflow.GenWithStackByArgs("DOUBLE", fmt.Sprintf("(%s / %s)", s.args[0].String(), s.args[1].String()))
 	}
 	return result, false, nil
 }
