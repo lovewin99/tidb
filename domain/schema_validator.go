@@ -15,9 +15,11 @@ package domain
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
+	"github.com/pingcap/tidb/config"
 	"github.com/pingcap/tidb/store/tikv/oracle"
 	"github.com/pingcap/tidb/util/logutil"
 	"go.uber.org/zap"
@@ -58,6 +60,15 @@ type deltaSchemaInfo struct {
 	relatedTableIDs []int64
 }
 
+type tsAndVer struct {
+	timeStamp time.Time
+	version   int64
+}
+
+func (t tsAndVer) String() string {
+	return fmt.Sprintf("tsAndVer[version:%d, ts: %d]", t.version, t.timeStamp.Second())
+}
+
 type schemaValidator struct {
 	isStarted          bool
 	mux                sync.RWMutex
@@ -66,6 +77,8 @@ type schemaValidator struct {
 	latestSchemaExpire time.Time
 	// deltaSchemaInfos is a queue that maintain the history of changes.
 	deltaSchemaInfos []deltaSchemaInfo
+	tabVerInfo       map[int64]tsAndVer
+	lastClearTime    time.Time
 }
 
 // NewSchemaValidator returns a SchemaValidator structure.
@@ -74,6 +87,9 @@ func NewSchemaValidator(lease time.Duration) SchemaValidator {
 		isStarted:        true,
 		lease:            lease,
 		deltaSchemaInfos: make([]deltaSchemaInfo, 0, maxNumberOfDiffsToLoad),
+		tabVerInfo:       make(map[int64]tsAndVer),
+		lastClearTime:    time.Now(),
+
 	}
 }
 
@@ -91,6 +107,9 @@ func (s *schemaValidator) Stop() {
 	s.isStarted = false
 	s.latestSchemaVer = 0
 	s.deltaSchemaInfos = make([]deltaSchemaInfo, 0, maxNumberOfDiffsToLoad)
+	s.tabVerInfo = make(map[int64]tsAndVer)
+	s.lastClearTime = time.Now()
+
 }
 
 func (s *schemaValidator) Restart() {
@@ -98,6 +117,7 @@ func (s *schemaValidator) Restart() {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 	s.isStarted = true
+	s.lastClearTime = time.Now()
 }
 
 func (s *schemaValidator) Reset() {
@@ -106,6 +126,8 @@ func (s *schemaValidator) Reset() {
 	s.isStarted = true
 	s.latestSchemaVer = 0
 	s.deltaSchemaInfos = make([]deltaSchemaInfo, 0, maxNumberOfDiffsToLoad)
+	s.tabVerInfo = make(map[int64]tsAndVer)
+	s.lastClearTime = time.Now()
 }
 
 func (s *schemaValidator) Update(leaseGrantTS uint64, oldVer, currVer int64, changedTableIDs []int64) {
@@ -150,14 +172,11 @@ func (s *schemaValidator) isRelatedTablesChanged(currVer int64, tableIDs []int64
 		logutil.Logger(context.Background()).Info("schema change history is empty", zap.Int64("currVer", currVer))
 		return true
 	}
-	newerDeltas := s.findNewerDeltas(currVer)
-	if len(newerDeltas) == len(s.deltaSchemaInfos) {
-		logutil.Logger(context.Background()).Info("the schema version is much older than the latest version", zap.Int64("currVer", currVer),
-			zap.Int64("latestSchemaVer", s.latestSchemaVer))
-		return true
-	}
-	for _, item := range newerDeltas {
-		if hasRelatedTableID(item.relatedTableIDs, tableIDs) {
+
+	// customed for olap use
+	for _, v := range tableIDs {
+		tsVer, ok := s.tabVerInfo[v]
+		if ok && tsVer.version > currVer {
 			return true
 		}
 	}
@@ -209,6 +228,18 @@ func (s *schemaValidator) Check(txnTS uint64, schemaVer int64, relatedTableIDs [
 }
 
 func (s *schemaValidator) enqueue(schemaVersion int64, relatedTableIDs []int64) {
+	now := time.Now()
+	if now.Sub(s.lastClearTime) > 60 {
+		s.lastClearTime = now
+		for k, v := range s.tabVerInfo {
+			if now.Sub(v.timeStamp).Seconds() > float64(config.GetGlobalConfig().TiKVClient.MaxTxnTimeUse) {
+				delete(s.tabVerInfo, k)
+			}
+		}
+	}
+	for _, v := range relatedTableIDs {
+		s.tabVerInfo[v] = tsAndVer{now, schemaVersion}
+	}
 	s.deltaSchemaInfos = append(s.deltaSchemaInfos, deltaSchemaInfo{schemaVersion, relatedTableIDs})
 	if len(s.deltaSchemaInfos) > maxNumberOfDiffsToLoad {
 		s.deltaSchemaInfos = s.deltaSchemaInfos[1:]
