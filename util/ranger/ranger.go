@@ -261,20 +261,20 @@ func buildColumnRange(accessConditions []expression.Expression, sc *stmtctx.Stat
 	if err != nil {
 		return nil, errors.Trace(err)
 	}
-	if colLen != types.UnspecifiedLength {
-		for _, ran := range ranges {
-			if CutDatumByPrefixLen(&ran.LowVal[0], colLen, tp) {
-				ran.LowExclude = false
-			}
-			if CutDatumByPrefixLen(&ran.HighVal[0], colLen, tp) {
-				ran.HighExclude = false
-			}
-		}
-		ranges, err = unionRanges(sc, ranges)
-		if err != nil {
-			return nil, err
-		}
-	}
+	//if colLen != types.UnspecifiedLength {
+	//	for _, ran := range ranges {
+	//		if CutDatumByPrefixLen(&ran.LowVal[0], colLen, tp) {
+	//			ran.LowExclude = false
+	//		}
+	//		if CutDatumByPrefixLen(&ran.HighVal[0], colLen, tp) {
+	//			ran.HighExclude = false
+	//		}
+	//	}
+	//	ranges, err = unionRanges(sc, ranges)
+	//	if err != nil {
+	//		return nil, err
+	//	}
+	//}
 	return ranges, nil
 }
 
