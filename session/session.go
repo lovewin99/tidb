@@ -1004,6 +1004,9 @@ func (s *session) execute(ctx context.Context, sql string) (recordSets []sqlexec
 	s.PrepareTxnCtx(ctx)
 	connID := s.sessionVars.ConnectionID
 	err = s.loadCommonGlobalVariablesIfNeeded()
+	if strings.Contains(sql, "zyt_car_1m_date") {
+		fmt.Println("1111")
+	}
 	if err != nil {
 		return nil, err
 	}

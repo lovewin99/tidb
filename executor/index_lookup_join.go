@@ -564,7 +564,10 @@ func (iw *innerWorker) sortAndDedupLookUpContents(lookUpContents []*indexJoinLoo
 	deDupedLookupKeys := lookUpContents[:1]
 	for i := 1; i < len(lookUpContents); i++ {
 		cmp := compareRow(sc, lookUpContents[i].keys, lookUpContents[i-1].keys)
-		if cmp != 0 || (iw.nextColCompareFilters != nil && iw.nextColCompareFilters.CompareRow(lookUpContents[i].row, lookUpContents[i-1].row) != 0) {
+		//if cmp != 0 || (iw.nextColCompareFilters != nil && iw.nextColCompareFilters.CompareRow(lookUpContents[i].row, lookUpContents[i-1].row) != 0) {
+		//	deDupedLookupKeys = append(deDupedLookupKeys, lookUpContents[i])
+		//}
+		if cmp != 0 {
 			deDupedLookupKeys = append(deDupedLookupKeys, lookUpContents[i])
 		}
 	}
