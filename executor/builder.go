@@ -2153,7 +2153,7 @@ func (builder *dataReaderBuilder) buildIndexLookUpReaderForIndexJoin(ctx context
 func buildKvRangesForIndexJoin(ctx sessionctx.Context, tableID, indexID int64, lookUpContents []*indexJoinLookUpContent,
 	ranges []*ranger.Range, keyOff2IdxOff []int, cwc *plannercore.ColWithCmpFuncManager) ([]kv.KeyRange, error) {
 	kvRanges := make([]kv.KeyRange, 0, len(ranges)*len(lookUpContents))
-	lastPos := len(ranges[0].LowVal) - 1
+	//lastPos := len(ranges[0].LowVal) - 1
 	sc := ctx.GetSessionVars().StmtCtx
 	for _, content := range lookUpContents {
 		for _, ran := range ranges {
@@ -2162,26 +2162,26 @@ func buildKvRangesForIndexJoin(ctx sessionctx.Context, tableID, indexID int64, l
 				ran.HighVal[idxOff] = content.keys[keyOff]
 			}
 		}
-		if cwc != nil {
-			nextColRanges, err := cwc.BuildRangesByRow(ctx, content.row)
-			if err != nil {
-				return nil, err
-			}
-			for _, nextColRan := range nextColRanges {
-				for _, ran := range ranges {
-					ran.LowVal[lastPos] = nextColRan.LowVal[0]
-					ran.HighVal[lastPos] = nextColRan.HighVal[0]
-					ran.LowExclude = nextColRan.LowExclude
-					ran.HighExclude = nextColRan.HighExclude
-				}
-				tmpKvRanges, err := distsql.IndexRangesToKVRanges(sc, tableID, indexID, ranges, nil)
-				if err != nil {
-					return nil, errors.Trace(err)
-				}
-				kvRanges = append(kvRanges, tmpKvRanges...)
-			}
-			continue
-		}
+		//if cwc != nil {
+		//	nextColRanges, err := cwc.BuildRangesByRow(ctx, content.row)
+		//	if err != nil {
+		//		return nil, err
+		//	}
+		//	for _, nextColRan := range nextColRanges {
+		//		for _, ran := range ranges {
+		//			ran.LowVal[lastPos] = nextColRan.LowVal[0]
+		//			ran.HighVal[lastPos] = nextColRan.HighVal[0]
+		//			ran.LowExclude = nextColRan.LowExclude
+		//			ran.HighExclude = nextColRan.HighExclude
+		//		}
+		//		tmpKvRanges, err := distsql.IndexRangesToKVRanges(sc, tableID, indexID, ranges, nil)
+		//		if err != nil {
+		//			return nil, errors.Trace(err)
+		//		}
+		//		kvRanges = append(kvRanges, tmpKvRanges...)
+		//	}
+		//	continue
+		//}
 
 		tmpKvRanges, err := distsql.IndexRangesToKVRanges(sc, tableID, indexID, ranges, nil)
 		if err != nil {
